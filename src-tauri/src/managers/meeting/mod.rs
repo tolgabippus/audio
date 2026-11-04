@@ -107,11 +107,10 @@ impl MeetingManager {
         std::fs::create_dir_all(&dir)?;
 
         let system = SystemAudioCapture::start(dir.join(SYSTEM_TRACK), started)?;
-        let microphone = self.open_microphone(&dir, started).map_err(|e| {
-            let problem = e.to_string();
-            self.warn(NoticeCode::MeetingNoMicrophone, problem.clone());
-            problem
-        });
+        let microphone = self
+            .open_microphone(&dir, started)
+            .map_err(|e| e.to_string());
+        let microphone_problem = microphone.as_ref().err().cloned();
 
         info!("Started meeting recording {id}");
         *active = Some(Active {
@@ -121,7 +120,11 @@ impl MeetingManager {
             microphone,
             system,
         });
+        // Raising a notice rebuilds the tray, which reads this lock.
         drop(active);
+        if let Some(problem) = microphone_problem {
+            self.warn(NoticeCode::MeetingNoMicrophone, problem);
+        }
         self.changed();
         Ok(self.state())
     }
@@ -262,7 +265,11 @@ impl MeetingManager {
         for entry in entries.flatten() {
             let id = entry.file_name().to_string_lossy().into_owned();
             let path = entry.path();
-            if !path.is_dir() || hm.get_audio_file_path(&recording_file_name(&id)).exists() {
+            let recording_now = self.lock().as_ref().is_some_and(|active| active.id == id);
+            if recording_now
+                || !path.is_dir()
+                || hm.get_audio_file_path(&recording_file_name(&id)).exists()
+            {
                 continue;
             }
             match self.import(&id, &path) {

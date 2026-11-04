@@ -77,11 +77,28 @@ chmod +x ~/Library/Application\ Support/com.pais.handy/hooks/transcription
 
 Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er muss den Text wieder auf stdout ausgeben, sonst wird nichts eingefügt.
 
-## Geplantes Feature: Meeting-Aufnahme mit System-Ton
+## Feature: Meeting-Aufnahme mit System-Ton
 
 **Ziel:** Handy soll Meetings (Zoom, Teams, Meet usw.) mitschneiden, mit **System-Ton und Mikrofon gleichzeitig**. Danach wird automatisch transkribiert und das Ergebnis landet im Verlauf. Das normale Diktieren muss unabhängig davon weiter funktionieren.
 
-**Status:** Der Spike für System-Ton ist erfolgreich (siehe unten), in Handy ist noch kein Code. Die Umsetzung soll **lokal auf dem Mac** passieren, weil die macOS-Teile in der Cloud (Linux) weder gebaut noch getestet werden können.
+**Status:** Stufe 1 ist umgesetzt (2026-11-04), aber **noch nicht mit einem echten Meeting getestet**. Stufe 2 ist offen. Die Umsetzung passiert **lokal auf dem Mac**, weil die macOS-Teile in der Cloud (Linux) weder gebaut noch getestet werden können.
+
+### Umsetzung Stufe 1 (so ist es gebaut)
+
+- **System-Ton über `cpal`, nicht über eine eigene Swift-Brücke.** `cpal` 0.18.2, das über `rodio::cpal` schon in Handy steckt, nimmt auf macOS mit `build_input_stream` auf einem _Ausgabegerät_ per Process Tap auf (`cpal/src/host/coreaudio/macos/loopback.rs`). Der Spike `CpalLoopbackSpike` hat das auf diesem Mac bestätigt. Vorteil: kein Swift, kein Eingriff in `build.rs`. Nachteil: Der Tap hängt am aktuellen Standard-Ausgabegerät. Wechselt man es, baut Handy den Stream neu auf.
+- `src-tauri/src/managers/meeting/`:
+  - `mod.rs` (`MeetingManager`): Start, Stopp, Mischen, Übergabe an den Verlauf, Wiederherstellung nach Absturz, `remove_tracks` beim Löschen.
+  - `system_audio.rs`: eigener Thread mit dem Loopback-Stream, Downmix und Resampling auf 16 kHz. Neuaufbau bei Fehler, bei Wechsel des Ausgabegeräts (alle 2 s geprüft) und **solange nur exakte Nullen kommen** (alle 4 s, höchstens 15-mal). Das löst Stolperfalle 1.
+  - `track.rs`: `TrackWriter`, 16-kHz-Mono-WAV, Header alle 5 s aktualisiert, Lücken mit Stille aufgefüllt, damit beide Spuren zeitgleich zum Meeting-Start bleiben. Dazu `mix_tracks`.
+- Mikrofon: eine zweite `handy_recorder::Recorder`-Instanz (`RecorderConfig::speech()`) auf dem Gerät, das auch das Diktieren nutzt (`AudioRecordingManager::selected_microphone_device`).
+- Dateien: Spuren in `<App-Daten>/meetings/<Start-ms>/mic.wav` und `system.wav`. Beim Stoppen entsteht `recordings/handy-meeting-<Start-ms>.wav`. Erst diese Datei markiert das Meeting als importiert. Danach läuft `TranscriptionJobManager::transcribe_recording` (neu), und der Verlauf nennt den Eintrag `Meeting JJJJ-MM-TT HH:MM`.
+- Resampler: von `audio_toolkit/audio/decode.rs` nach `audio_toolkit/audio/resample.rs` (`MonoResampler`, jetzt mit `take_output`) verschoben.
+- Bedienung: Shortcut-Binding `meeting_toggle` (macOS `option+shift+m`, sonst `ctrl+alt+m`) in `settings.rs` und `actions.rs`, Tray-Eintrag `meeting_toggle` in `tray.rs` und `lib.rs`, Befehle in `commands/meeting.rs`, Event `MeetingState`, Seite `src/components/settings/meeting/`.
+- Meldungen: `NoticeSource::Meeting` mit `MeetingRecordingFailed` (Error), `MeetingNoSystemAudio` und `MeetingNoMicrophone` (Warning).
+- Texte: Deutsch und Englisch übersetzt, die anderen 24 Sprachen vorerst mit englischem Text.
+- `Info.plist`: `NSAudioCaptureUsageDescription` ergänzt.
+- Bekannte Grenzen: Mit „Stummschalten während der Aufnahme“ ist auch die System-Spur stumm, solange man nebenher diktiert. Echo ohne Kopfhörer wird nicht entfernt. Mehrere Ausgabegeräte gleichzeitig (Multi-Output) sind nicht getestet. Auf Linux kann `cpal` (ALSA) keinen Loopback, dort kommt die Warnung „ohne System-Ton“.
+- **Testen nur als echte App:** `tauri dev` startet keine `.app`, dann fragt macOS die Berechtigung für den falschen Prozess ab. Bauen mit `CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app -c '{"bundle":{"createUpdaterArtifacts":false}}'` und `src-tauri/target/release/bundle/macos/Handy.app` per `open` starten. Ein Debug-Bundle scheitert, weil es beim Start `../src/bindings.ts` relativ zum Arbeitsverzeichnis schreiben will.
 
 ### Ergebnis des Spikes (2026-11-04, macOS 26.6.2)
 
@@ -137,5 +154,5 @@ Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er mu
 2. ~~Toolchain prüfen bzw. installieren.~~ Erledigt.
 3. ~~`bun install`, VAD-Modell, `bun run tauri dev` als Baseline.~~ Erledigt.
 4. ~~**Spike:** 10 s System-Ton als WAV.~~ Erledigt, Ton kommt an (siehe oben).
-5. Stufe 1 umsetzen, vom Besitzer mit einem echten Meeting testen lassen, dann Stufe 2.
+5. ~~Stufe 1 umsetzen.~~ Erledigt. **Offen:** vom Besitzer mit einem echten Meeting testen lassen, danach Stufe 2.
 6. Vor jedem Commit `bun run lint`, `bun run format`, `cargo clippy` und `bun run check:translations` laufen lassen. Commits mit Conventional-Commit-Präfix (siehe `AGENTS.md`).

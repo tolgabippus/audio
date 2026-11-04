@@ -148,6 +148,19 @@ impl TranscriptionJobManager {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.display().to_string());
+        self.transcribe_recording(file_name, source_name)
+    }
+
+    /// Adds a recording already saved in the recordings folder (16 kHz mono
+    /// WAV) to History under `source_name`, and queues it. The recording is
+    /// removed if the entry can't be saved.
+    pub fn transcribe_recording(
+        &self,
+        file_name: String,
+        source_name: String,
+    ) -> Result<HistoryEntry> {
+        let hm = self.app.state::<Arc<HistoryManager>>();
+        let recording = hm.get_audio_file_path(&file_name);
         let entry = match hm.save_file_entry(file_name, source_name) {
             Ok(entry) => entry,
             Err(e) => {

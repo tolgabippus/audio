@@ -3,6 +3,8 @@
     "settings": "Ayarlar...",
     "checkUpdates": "Güncellemeleri Kontrol Et...",
     "copyLastTranscript": "Son Transkripti Kopyala",
+    "startMeeting": "Start Meeting Recording",
+    "stopMeeting": "Stop Meeting Recording",
     "unloadModel": "Modeli Boşalt",
     "model": "Model",
     "quit": "Çıkış",
@@ -18,6 +20,7 @@
     "advanced": "Gelişmiş",
     "postProcessing": "Son İşlem",
     "history": "Geçmiş",
+    "meeting": "Meeting",
     "debug": "Hata Ayıklama",
     "about": "Hakkında"
   },
@@ -348,6 +351,10 @@
           "transcribe_with_post_process": {
             "name": "Son İşlem Kısayolu",
             "description": "İsteğe bağlı: Transkripsiyonunuza her zaman yapay zekâ ile son işlem uygulayan özel bir kısayol tuşu."
+          },
+          "meeting_toggle": {
+            "name": "Meeting Recording Shortcut",
+            "description": "Starts or stops recording a meeting: your microphone and your computer's sound."
           }
         },
         "errors": {
@@ -390,6 +397,23 @@
           "toggle": "Kaydı başlatmak için kısayola dokunun, durdurmak için tekrar dokunun"
         }
       }
+    },
+    "meeting": {
+      "title": "Meeting Recording",
+      "description": "Records your microphone and everything your computer plays, such as a Zoom, Teams or Meet call. When you stop, the meeting is transcribed into History.",
+      "start": "Start Recording",
+      "stop": "Stop and Transcribe",
+      "starting": "Starting…",
+      "stopping": "Saving…",
+      "recording": "Recording",
+      "idle": "Not recording",
+      "saved": "Meeting saved to History. Transcription is running.",
+      "startFailed": "Failed to start the meeting recording: {{error}}",
+      "stopFailed": "Failed to save the meeting recording: {{error}}",
+      "tipsTitle": "Before You Record",
+      "consent": "Only record people who have agreed to it. Recording a private conversation without consent is a crime in many countries.",
+      "headphones": "Use headphones. Without them your microphone also picks up the other side, and their words appear twice.",
+      "permission": "The first time, macOS asks whether Handy may record system audio. You can change this in System Settings → Privacy & Security → Screen & System Audio Recording."
     },
     "models": {
       "title": "Modeller",
@@ -951,6 +975,11 @@
     "filePostProcessFailedTitle": "Son işlem olmadan yazıya döküldü",
     "filePostProcessFailed": "Son işlem tamamlanmadı, bu yüzden metin olduğu gibi kaydedildi.",
     "fileTranscriptionFailedTitle": "Dosya transkripsiyonu başarısız oldu",
+    "meetingRecordingFailedTitle": "Meeting Recording Failed",
+    "meetingNoSystemAudioTitle": "Meeting Recorded Without System Audio",
+    "meetingNoSystemAudio": "Only your microphone was recorded. On macOS, allow Handy in System Settings → Privacy & Security → Screen & System Audio Recording, then record again.",
+    "meetingNoMicrophoneTitle": "Meeting Recorded Without Microphone",
+    "meetingNoMicrophone": "Only your computer's sound was recorded, so your own words are missing.",
     "transcriptionFailedTitle": "Transkripsiyon başarısız oldu"
   },
   "notices": {

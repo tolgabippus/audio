@@ -3,6 +3,8 @@
     "settings": "Einstellungen...",
     "checkUpdates": "Nach Updates suchen...",
     "copyLastTranscript": "Letzte Transkription kopieren",
+    "startMeeting": "Meeting-Aufnahme starten",
+    "stopMeeting": "Meeting-Aufnahme stoppen",
     "unloadModel": "Modell entladen",
     "model": "Modell",
     "quit": "Beenden",
@@ -18,6 +20,7 @@
     "advanced": "Erweitert",
     "postProcessing": "Nachbearbeitung",
     "history": "Verlauf",
+    "meeting": "Meeting",
     "debug": "Debug",
     "about": "Info"
   },
@@ -348,6 +351,10 @@
           "transcribe_with_post_process": {
             "name": "Nachbearbeitungs-Tastenkürzel",
             "description": "Optional: Ein dediziertes Tastenkürzel, das immer die KI-Nachbearbeitung auf deine Transkription anwendet."
+          },
+          "meeting_toggle": {
+            "name": "Meeting-Tastenkürzel",
+            "description": "Startet oder stoppt die Aufnahme eines Meetings: dein Mikrofon und den Ton deines Computers."
           }
         },
         "errors": {
@@ -390,6 +397,23 @@
           "toggle": "Tastenkombination antippen, um die Aufnahme zu starten, erneut antippen zum Stoppen"
         }
       }
+    },
+    "meeting": {
+      "title": "Meeting-Aufnahme",
+      "description": "Nimmt dein Mikrofon und alles auf, was dein Computer abspielt, zum Beispiel ein Gespräch in Zoom, Teams oder Meet. Nach dem Stoppen wird das Meeting im Verlauf transkribiert.",
+      "start": "Aufnahme starten",
+      "stop": "Stoppen und transkribieren",
+      "starting": "Wird gestartet…",
+      "stopping": "Wird gespeichert…",
+      "recording": "Aufnahme läuft",
+      "idle": "Keine Aufnahme",
+      "saved": "Meeting im Verlauf gespeichert. Die Transkription läuft.",
+      "startFailed": "Die Meeting-Aufnahme konnte nicht starten: {{error}}",
+      "stopFailed": "Die Meeting-Aufnahme konnte nicht gespeichert werden: {{error}}",
+      "tipsTitle": "Vor der Aufnahme",
+      "consent": "Nimm nur Personen auf, die zugestimmt haben. Nicht-öffentliche Gespräche ohne Zustimmung aufzunehmen ist strafbar (§ 201 StGB).",
+      "headphones": "Nutze Kopfhörer. Ohne sie nimmt dein Mikrofon auch die Gegenseite auf, und ihre Worte stehen doppelt im Transkript.",
+      "permission": "Beim ersten Mal fragt macOS, ob Handy den System-Ton aufnehmen darf. Ändern kannst du das unter Systemeinstellungen → Datenschutz & Sicherheit → Bildschirm- & Systemaudioaufnahme."
     },
     "models": {
       "title": "Modelle",
@@ -951,6 +975,11 @@
     "filePostProcessFailedTitle": "Ohne Nachbearbeitung transkribiert",
     "filePostProcessFailed": "Die Nachbearbeitung wurde nicht abgeschlossen, daher wurde das Transkript unverändert gespeichert.",
     "fileTranscriptionFailedTitle": "Dateitranskription fehlgeschlagen",
+    "meetingRecordingFailedTitle": "Meeting-Aufnahme fehlgeschlagen",
+    "meetingNoSystemAudioTitle": "Meeting ohne System-Ton aufgenommen",
+    "meetingNoSystemAudio": "Nur dein Mikrofon wurde aufgenommen. Erlaube Handy auf macOS unter Systemeinstellungen → Datenschutz & Sicherheit → Bildschirm- & Systemaudioaufnahme und nimm dann erneut auf.",
+    "meetingNoMicrophoneTitle": "Meeting ohne Mikrofon aufgenommen",
+    "meetingNoMicrophone": "Nur der Ton deines Computers wurde aufgenommen, deine eigenen Worte fehlen also.",
     "transcriptionFailedTitle": "Transkription fehlgeschlagen"
   },
   "notices": {

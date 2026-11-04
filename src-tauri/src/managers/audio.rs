@@ -593,6 +593,13 @@ impl AudioRecordingManager {
         *self.cached_device.lock().unwrap() = None;
     }
 
+    /// The recorder device ID of the microphone dictation would use now
+    /// (`None`: the system default), for a recorder of its own.
+    pub fn selected_microphone_device(&self) -> Option<String> {
+        self.resolve_microphone_device(&get_settings(&self.app_handle))
+            .device
+    }
+
     fn resolve_microphone_device(&self, settings: &AppSettings) -> MicrophoneResolution {
         let desired = self.desired_microphone(settings);
         let (device_name, selected_microphone) = match desired {

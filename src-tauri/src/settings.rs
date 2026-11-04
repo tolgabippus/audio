@@ -998,6 +998,20 @@ pub fn get_default_settings() -> AppSettings {
             current_binding: "escape".to_string(),
         },
     );
+    #[cfg(target_os = "macos")]
+    let default_meeting_shortcut = "option+shift+m";
+    #[cfg(not(target_os = "macos"))]
+    let default_meeting_shortcut = "ctrl+alt+m";
+    bindings.insert(
+        "meeting_toggle".to_string(),
+        ShortcutBinding {
+            id: "meeting_toggle".to_string(),
+            name: "Meeting Recording".to_string(),
+            description: "Starts or stops recording a meeting.".to_string(),
+            default_binding: default_meeting_shortcut.to_string(),
+            current_binding: default_meeting_shortcut.to_string(),
+        },
+    );
 
     AppSettings {
         settings_schema_version: default_settings_schema_version(),

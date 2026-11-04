@@ -4,6 +4,7 @@ use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, S
 use crate::audio_toolkit::VadPolicy;
 use crate::managers::audio::{recording_notice_code, AudioRecordingManager};
 use crate::managers::history::HistoryManager;
+use crate::managers::meeting::MeetingManager;
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::policy::{live_decode, LiveDecode, ModelTraits};
 use crate::managers::transcription::StreamWorkKind;
@@ -1020,6 +1021,17 @@ impl ShortcutAction for CancelAction {
     }
 }
 
+// Meeting Action: each press starts or stops a meeting recording.
+struct MeetingToggleAction;
+
+impl ShortcutAction for MeetingToggleAction {
+    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        app.state::<Arc<MeetingManager>>().toggle();
+    }
+
+    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}
+}
+
 // Test Action
 struct TestAction;
 
@@ -1059,6 +1071,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map.insert(
         "cancel".to_string(),
         Arc::new(CancelAction) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "meeting_toggle".to_string(),
+        Arc::new(MeetingToggleAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "test".to_string(),

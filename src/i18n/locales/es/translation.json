@@ -3,6 +3,8 @@
     "settings": "Configuración...",
     "checkUpdates": "Buscar actualizaciones...",
     "copyLastTranscript": "Copiar la última transcripción",
+    "startMeeting": "Start Meeting Recording",
+    "stopMeeting": "Stop Meeting Recording",
     "unloadModel": "Descargar modelo",
     "model": "Modelo",
     "quit": "Salir",
@@ -18,6 +20,7 @@
     "advanced": "Avanzado",
     "postProcessing": "Post proceso",
     "history": "Historial",
+    "meeting": "Meeting",
     "debug": "Depuración",
     "about": "Acerca de"
   },
@@ -348,6 +351,10 @@
           "transcribe_with_post_process": {
             "name": "Tecla de post procesamiento",
             "description": "Opcional: Una tecla de acceso rápido dedicada que siempre aplica post procesamiento con IA a tu transcripción."
+          },
+          "meeting_toggle": {
+            "name": "Meeting Recording Shortcut",
+            "description": "Starts or stops recording a meeting: your microphone and your computer's sound."
           }
         },
         "errors": {
@@ -390,6 +397,23 @@
           "toggle": "Toca el atajo para empezar a grabar, tócalo de nuevo para detener"
         }
       }
+    },
+    "meeting": {
+      "title": "Meeting Recording",
+      "description": "Records your microphone and everything your computer plays, such as a Zoom, Teams or Meet call. When you stop, the meeting is transcribed into History.",
+      "start": "Start Recording",
+      "stop": "Stop and Transcribe",
+      "starting": "Starting…",
+      "stopping": "Saving…",
+      "recording": "Recording",
+      "idle": "Not recording",
+      "saved": "Meeting saved to History. Transcription is running.",
+      "startFailed": "Failed to start the meeting recording: {{error}}",
+      "stopFailed": "Failed to save the meeting recording: {{error}}",
+      "tipsTitle": "Before You Record",
+      "consent": "Only record people who have agreed to it. Recording a private conversation without consent is a crime in many countries.",
+      "headphones": "Use headphones. Without them your microphone also picks up the other side, and their words appear twice.",
+      "permission": "The first time, macOS asks whether Handy may record system audio. You can change this in System Settings → Privacy & Security → Screen & System Audio Recording."
     },
     "models": {
       "title": "Modelos",
@@ -951,6 +975,11 @@
     "filePostProcessFailedTitle": "Transcrito sin post proceso",
     "filePostProcessFailed": "El post proceso no terminó, así que la transcripción se guardó tal cual.",
     "fileTranscriptionFailedTitle": "Error al transcribir el archivo",
+    "meetingRecordingFailedTitle": "Meeting Recording Failed",
+    "meetingNoSystemAudioTitle": "Meeting Recorded Without System Audio",
+    "meetingNoSystemAudio": "Only your microphone was recorded. On macOS, allow Handy in System Settings → Privacy & Security → Screen & System Audio Recording, then record again.",
+    "meetingNoMicrophoneTitle": "Meeting Recorded Without Microphone",
+    "meetingNoMicrophone": "Only your computer's sound was recorded, so your own words are missing.",
     "transcriptionFailedTitle": "Error de transcripción"
   },
   "notices": {

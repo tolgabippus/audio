@@ -42,6 +42,7 @@ pub use utils::env_flag_enabled;
 use env_filter::Builder as EnvFilterBuilder;
 use managers::audio::AudioRecordingManager;
 use managers::history::HistoryManager;
+use managers::meeting::MeetingManager;
 use managers::model::ModelManager;
 use managers::transcription::TranscriptionManager;
 use managers::transcription_jobs::TranscriptionJobManager;
@@ -221,6 +222,10 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(history_manager.clone());
     app_handle.manage(tray::TrayState::new());
     app_handle.manage(TranscriptionJobManager::new(app_handle));
+    let meeting_manager = MeetingManager::new(app_handle);
+    app_handle.manage(meeting_manager.clone());
+    // A meeting a crash or quit cut short goes to History now.
+    std::thread::spawn(move || meeting_manager.recover_unfinished());
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -307,6 +312,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             }
             "copy_last_transcript" => {
                 tray::copy_last_transcript(app);
+            }
+            "meeting_toggle" => {
+                app.state::<Arc<MeetingManager>>().toggle();
             }
             "unload_model" => {
                 let transcription_manager = app.state::<Arc<TranscriptionManager>>();
@@ -809,6 +817,9 @@ pub fn run(cli_args: CliArgs) {
             commands::history::retry_history_entry_transcription,
             commands::history::cancel_history_entry_transcription,
             commands::history::transcribe_file,
+            commands::meeting::get_meeting_state,
+            commands::meeting::start_meeting,
+            commands::meeting::stop_meeting,
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
             helpers::clamshell::is_laptop,
@@ -819,6 +830,7 @@ pub fn run(cli_args: CliArgs) {
         .events(collect_events![
             managers::history::HistoryUpdatePayload,
             managers::transcription_jobs::TranscriptionJob,
+            managers::meeting::MeetingState,
             managers::transcription::StreamTextEvent,
             managers::transcription::StreamPhaseEvent,
             transcription_coordinator::RecordingStateEvent,

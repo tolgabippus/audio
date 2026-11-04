@@ -3,6 +3,8 @@
     "settings": "設定...",
     "checkUpdates": "檢查更新...",
     "copyLastTranscript": "複製最新轉錄",
+    "startMeeting": "Start Meeting Recording",
+    "stopMeeting": "Stop Meeting Recording",
     "unloadModel": "卸載模型",
     "model": "模型",
     "quit": "結束",
@@ -18,6 +20,7 @@
     "advanced": "進階",
     "postProcessing": "後處理",
     "history": "歷史紀錄",
+    "meeting": "Meeting",
     "debug": "偵錯",
     "about": "關於"
   },
@@ -348,6 +351,10 @@
           "transcribe_with_post_process": {
             "name": "後處理快捷鍵",
             "description": "可選：專用快捷鍵，使用時一律對轉錄結果套用 AI 後處理"
+          },
+          "meeting_toggle": {
+            "name": "Meeting Recording Shortcut",
+            "description": "Starts or stops recording a meeting: your microphone and your computer's sound."
           }
         },
         "errors": {
@@ -390,6 +397,23 @@
           "toggle": "輕按快捷鍵開始錄音，再次輕按停止"
         }
       }
+    },
+    "meeting": {
+      "title": "Meeting Recording",
+      "description": "Records your microphone and everything your computer plays, such as a Zoom, Teams or Meet call. When you stop, the meeting is transcribed into History.",
+      "start": "Start Recording",
+      "stop": "Stop and Transcribe",
+      "starting": "Starting…",
+      "stopping": "Saving…",
+      "recording": "Recording",
+      "idle": "Not recording",
+      "saved": "Meeting saved to History. Transcription is running.",
+      "startFailed": "Failed to start the meeting recording: {{error}}",
+      "stopFailed": "Failed to save the meeting recording: {{error}}",
+      "tipsTitle": "Before You Record",
+      "consent": "Only record people who have agreed to it. Recording a private conversation without consent is a crime in many countries.",
+      "headphones": "Use headphones. Without them your microphone also picks up the other side, and their words appear twice.",
+      "permission": "The first time, macOS asks whether Handy may record system audio. You can change this in System Settings → Privacy & Security → Screen & System Audio Recording."
     },
     "models": {
       "title": "模型",
@@ -951,6 +975,11 @@
     "filePostProcessFailedTitle": "已轉錄，未經後處理",
     "filePostProcessFailed": "後處理未完成，因此按原樣儲存轉錄內容。",
     "fileTranscriptionFailedTitle": "檔案轉錄失敗",
+    "meetingRecordingFailedTitle": "Meeting Recording Failed",
+    "meetingNoSystemAudioTitle": "Meeting Recorded Without System Audio",
+    "meetingNoSystemAudio": "Only your microphone was recorded. On macOS, allow Handy in System Settings → Privacy & Security → Screen & System Audio Recording, then record again.",
+    "meetingNoMicrophoneTitle": "Meeting Recorded Without Microphone",
+    "meetingNoMicrophone": "Only your computer's sound was recorded, so your own words are missing.",
     "transcriptionFailedTitle": "轉錄失敗"
   },
   "notices": {

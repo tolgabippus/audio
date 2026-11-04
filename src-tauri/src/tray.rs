@@ -21,6 +21,7 @@
 //! icon/menu/tooltip, so those must only ever be set through the applier.
 
 use crate::managers::history::{HistoryEntry, HistoryManager};
+use crate::managers::meeting::MeetingManager;
 use crate::managers::model::{ModelInfo, ModelManager};
 use crate::managers::transcription::TranscriptionManager;
 use crate::notices::{self, NoticeCode};
@@ -72,6 +73,8 @@ struct MenuInputs {
     update_checks_enabled: bool,
     /// The language submenu, when the selected model has languages to pick.
     language: Option<LanguageMenu>,
+    /// A meeting is being recorded: the meeting item offers to stop it.
+    meeting_recording: bool,
 }
 
 /// What the language submenu shows: `(code, name)` entries, with codes as
@@ -355,6 +358,9 @@ fn compute_desired(app: &AppHandle, icon_state: TrayIconState) -> TrayDesired {
     let tm = app.state::<Arc<TranscriptionManager>>();
     let model_loaded = tm.is_model_loaded();
     let models_locked = tm.job_active();
+    let meeting_recording = app
+        .try_state::<Arc<MeetingManager>>()
+        .is_some_and(|meetings| meetings.is_recording());
 
     let mut downloaded_models: Vec<(String, String)> = app
         .state::<Arc<ModelManager>>()
@@ -394,6 +400,7 @@ fn compute_desired(app: &AppHandle, icon_state: TrayIconState) -> TrayDesired {
             locale: settings.app_language,
             update_checks_enabled: settings.update_checks_enabled,
             language,
+            meeting_recording,
         },
     }
 }
@@ -690,6 +697,12 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
         None::<&str>,
     )?;
     let quit_i = MenuItem::with_id(app, "quit", &strings.quit, true, quit_accelerator)?;
+    let meeting_label = if inputs.meeting_recording {
+        &strings.stop_meeting
+    } else {
+        &strings.start_meeting
+    };
+    let meeting_i = MenuItem::with_id(app, "meeting_toggle", meeting_label, true, None::<&str>)?;
     let separator = || PredefinedMenuItem::separator(app);
 
     let menu = if inputs.busy {
@@ -701,6 +714,7 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
                 &separator()?,
                 &cancel_i,
                 &separator()?,
+                &meeting_i,
                 &copy_last_transcript_i,
                 &separator()?,
                 &settings_i,
@@ -740,6 +754,7 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
             &[
                 &version_i,
                 &separator()?,
+                &meeting_i,
                 &copy_last_transcript_i,
                 &separator()?,
                 &model_submenu,
@@ -751,9 +766,10 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
                 &quit_i,
             ],
         )?;
-        // Right below the model submenu: version, separator, copy, separator, model.
+        // Right below the model submenu: version, separator, meeting, copy,
+        // separator, model.
         if let Some(language) = &inputs.language {
-            menu.insert(&language_submenu(app, &strings, language)?, 5)?;
+            menu.insert(&language_submenu(app, &strings, language)?, 6)?;
         }
         menu
     };
@@ -989,6 +1005,7 @@ mod tests {
             locale: "en".to_string(),
             update_checks_enabled: true,
             language: None,
+            meeting_recording: false,
         }
     }
 

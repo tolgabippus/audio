@@ -701,6 +701,7 @@ impl HistoryManager {
                     // Continue with database deletion even if file deletion fails
                 }
             }
+            crate::managers::meeting::remove_tracks(&self.app_handle, &entry.file_name);
         }
 
         // Delete from database

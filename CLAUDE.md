@@ -137,9 +137,18 @@ Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er mu
 - Zu prüfen ist, ob `transcribe-cpp` Segment-Zeitstempel liefert. Der Katalog hat `capabilities.timestamps`, aber `managers/transcription*` nutzt sie derzeit nicht. Notfalls über die Chunk-Grenzen annähern.
 - Das ist keine echte Sprechererkennung: Mehrere Personen auf der Gegenseite bleiben „Andere“.
 
-### Später möglich
+### Ergebnis des ersten Tests (2026-11-04)
 
-- Zusammenfassung oder Aufgabenliste über die vorhandene LLM-Nachbearbeitung
+- 87 s Meeting mit YouTube-Video und AirPods: Der System-Ton kam durchgehend an, die Transkription brauchte 14 s (Parakeet TDT 0.6B v3, CPU). Der Neuaufbau bei Stille hat nach 4 s gegriffen.
+- **Die eigene Stimme fehlte im Text**, weil der Besitzer gleichzeitig mit dem Video sprach. In der Mischung gewinnt eine Stimme. Das ist das stärkste Argument für Stufe 2.
+- Mit AirPods als Mikrofon wechselt macOS in den Headset-Modus: Der System-Ton kommt dann mit 24 kHz mono statt 48 kHz stereo. Für die Spracherkennung reicht das.
+
+### Ideen des Besitzers für später (Reihenfolge offen)
+
+- **Stufe 2:** getrennte Spuren „Du“ und „Andere“ (siehe oben).
+- **Meetings im Verlauf einheitlich kategorisieren:** eigene Ansicht oder einen Filter „Meetings“, Titel umbenennen, eventuell Tags oder Ordner. Heute erkennt man Meetings nur am `file_name`-Präfix `handy-meeting-` bzw. am `source_name` „Meeting …“. Für echte Kategorien braucht es eine eigene Spalte oder Tabelle in `history.db` (Migration in `managers/history.rs`).
+- **Zusammenfassung mit den wichtigsten Punkten und Aufgaben** über die vorhandene LLM-Nachbearbeitung (`llm_client.rs`, Anbieter in `settings.rs`). Der Anbieter `custom` zeigt standardmäßig auf `http://localhost:11434/v1` (Ollama), damit bliebe auch der Text lokal. Apple Intelligence gibt es nur auf Apple Silicon. Ein eigener Prompt für Meetings, getrennt vom Diktier-Prompt, und ein langes Transkript müssen eventuell in Teilen zusammengefasst werden.
+- **Bedienung allgemein ausbauen**, zum Beispiel eine Meeting-Detailansicht mit Transkript, Zusammenfassung und Audio.
 
 ### Erwartungen und Stolperfallen
 

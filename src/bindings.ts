@@ -1006,6 +1006,31 @@ async transcribeFile(path: string) : Promise<Result<HistoryEntry, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getMeetingState() : Promise<MeetingState> {
+    return await TAURI_INVOKE("get_meeting_state");
+},
+/**
+ * Starts recording the microphone and system audio.
+ */
+async startMeeting() : Promise<Result<MeetingState, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_meeting") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stops recording and queues the meeting's transcription in History.
+ */
+async stopMeeting() : Promise<Result<HistoryEntry, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_meeting") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async updateHistoryLimit(limit: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_history_limit", { limit }) };
@@ -1059,6 +1084,7 @@ async dismissOverlayNotice() : Promise<void> {
 
 export const events = __makeEvents__<{
 historyUpdatePayload: HistoryUpdatePayload,
+meetingState: MeetingState,
 noticesChanged: NoticesChanged,
 recordingStateEvent: RecordingStateEvent,
 streamPhaseEvent: StreamPhaseEvent,
@@ -1067,6 +1093,7 @@ transcriptionCompleteEvent: TranscriptionCompleteEvent,
 transcriptionJob: TranscriptionJob
 }>({
 historyUpdatePayload: "history-update-payload",
+meetingState: "meeting-state",
 noticesChanged: "notices-changed",
 recordingStateEvent: "recording-state-event",
 streamPhaseEvent: "stream-phase-event",
@@ -1302,6 +1329,14 @@ export type LanguageStatus =
  */
 { kind: "auto_unavailable"; language: string; reason: AutoUnavailableReason }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
+/**
+ * Whether a meeting is being recorded, and since when.
+ */
+export type MeetingState = { recording: boolean; 
+/**
+ * Unix milliseconds; set while recording.
+ */
+started_at_ms: number | null }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 /**
@@ -1337,7 +1372,7 @@ detail: string | null }
 /**
  * The frontend maps each code to its text in `src/lib/notices.ts`.
  */
-export type NoticeCode = "TranscriptionFailed" | "PasteFailed" | "NoMicrophone" | "MicPermissionDenied" | "RecordingFailed" | "ModelLoadFailed" | "PostProcessFailed" | "FileTranscriptionFailed" | "FilePostProcessFailed"
+export type NoticeCode = "TranscriptionFailed" | "PasteFailed" | "NoMicrophone" | "MicPermissionDenied" | "RecordingFailed" | "ModelLoadFailed" | "PostProcessFailed" | "FileTranscriptionFailed" | "FilePostProcessFailed" | "MeetingRecordingFailed" | "MeetingNoSystemAudio" | "MeetingNoMicrophone"
 export type NoticeLevel = 
 /**
  * Nothing came out, or Handy can't do its job.
@@ -1349,10 +1384,11 @@ export type NoticeLevel =
 "warning"
 /**
  * Each source has one slot in the store. Only dictation notices use the
- * overlay: a file job finishes while the user is doing something else, and
- * `Model` is a switch the user made in Settings or the tray.
+ * overlay: a file job finishes while the user is doing something else,
+ * `Model` is a switch the user made in Settings or the tray, and a meeting
+ * recording runs in the background.
  */
-export type NoticeSource = "dictation" | "file" | "model"
+export type NoticeSource = "dictation" | "file" | "model" | "meeting"
 export type NoticesChanged = { 
 /**
  * Every active notice, newest first.

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.tolgabippus.system-audio-spike</string>
+    <key>CFBundleName</key>
+    <string>SystemAudioSpike</string>
+    <key>CFBundleExecutable</key>
+    <string>SystemAudioSpike</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.2</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Test: nimmt 10 Sekunden System-Ton auf, um die Meeting-Aufnahme fuer Handy vorzubereiten.</string>
+</dict>
+</plist>

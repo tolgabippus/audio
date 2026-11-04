@@ -16,7 +16,9 @@ Dieser Abschnitt hält fest, was in einer früheren Claude-Code-Sitzung (Cloud, 
 
 ## Rechner des Besitzers
 
-- **MacBook Pro 2019, Intel i9, 64 GB RAM.** Die macOS-Version ist noch unbekannt, mit `sw_vers` prüfen.
+- **MacBook Pro 2019, Intel i9-9980HK, 64 GB RAM, macOS 26.6.2** (geprüft am 2026-11-04).
+- Toolchain (2026-11-04 eingerichtet): Xcode (Swift 6.2, SDK 26.2), Rust 1.99 per rustup, Bun 1.4 per bun.sh-Installer, cmake 4.3, Homebrew. In Befehlen aus Claude Code ggf. `export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"` voranstellen.
+- `CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri dev` läuft. Der erste Build dauerte gut 6 Minuten. transcribe-cpp meldet nur ein Compute-Device: CPU.
 - Handy 0.10.0 ist über Homebrew installiert (`brew install --cask handy`), also die offizielle, signierte Upstream-Version unter `/Applications/Handy.app`.
 - Homebrew unterstützt Intel-Macs nur noch als „Tier 3“ (keine Bottles mehr). Casks installieren trotzdem normal. Ein alter Tap `adntgv/tap` wird als „nicht vertrauenswürdig“ gemeldet und hat nichts mit Handy zu tun.
 - Standard-Shortcuts auf macOS (`src-tauri/src/settings.rs`): `option+space` diktieren, `option+shift+space` diktieren mit LLM-Nachbearbeitung, `escape` abbrechen.
@@ -79,7 +81,17 @@ Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er mu
 
 **Ziel:** Handy soll Meetings (Zoom, Teams, Meet usw.) mitschneiden, mit **System-Ton und Mikrofon gleichzeitig**. Danach wird automatisch transkribiert und das Ergebnis landet im Verlauf. Das normale Diktieren muss unabhängig davon weiter funktionieren.
 
-**Status:** nur geplant, noch kein Code. Die Umsetzung soll **lokal auf dem Mac** passieren, weil die macOS-Teile in der Cloud (Linux) weder gebaut noch getestet werden können.
+**Status:** Der Spike für System-Ton ist erfolgreich (siehe unten), in Handy ist noch kein Code. Die Umsetzung soll **lokal auf dem Mac** passieren, weil die macOS-Teile in der Cloud (Linux) weder gebaut noch getestet werden können.
+
+### Ergebnis des Spikes (2026-11-04, macOS 26.6.2)
+
+- Code und Bauanleitung liegen in `docs/spikes/system-audio-tap/`.
+- Eine kleine Swift-App mit **Core Audio Process Tap** (`CATapDescription(stereoGlobalTapButExcludeProcesses: [])`, `isPrivate`, `muteBehavior = .unmuted`, privates Aggregate Device mit dem Standard-Ausgabegerät als Main-Sub-Device und dem Tap in `kAudioAggregateDeviceTapListKey`, `AudioDeviceCreateIOProcIDWithBlock`) hat 10 s YouTube-Ton sauber aufgenommen. Pegel durchgehend etwa -18 bis -25 dBFS RMS.
+- Tap-Format hier: **48 kHz, 2 Kanäle, Float32 interleaved**. Für Handy muss das auf 16 kHz mono gebracht werden.
+- Die App braucht ein eigenes Bundle mit `NSAudioCaptureUsageDescription` in der `Info.plist`. Gestartet wurde sie per `open`, damit macOS sie selbst und nicht Claude oder Terminal um Erlaubnis fragt. Berechtigung: TCC-Dienst `kTCCServiceAudioCapture`, in den Einstellungen unter „Bildschirm- & Systemaudioaufnahme → Nur Systemaudioaufnahme“.
+- **Stolperfalle 1:** Der Dialog erscheint erst beim Start der Aufnahme. Wer dann erlaubt, bekommt **für diese Sitzung nur Nullen**. Es kommt kein Fehler, nur digitale Stille. Erst ab dem nächsten Start kommt Ton. Handy sollte also vorab um Erlaubnis bitten oder den Tap nach dem Erlauben neu aufbauen und anhaltende exakte Stille als möglichen Hinweis auf eine fehlende Berechtigung melden.
+- **Stolperfalle 2:** Jeder Neubau mit Ad-hoc-Signatur ändert die Code-Signatur, und macOS fragt erneut.
+- Für die Analyse von Logs: Die TCC-Entscheidung steht in `log show --predicate 'process == "tccd"'` als `AUTHREQ_RESULT … authValue=2` (erlaubt).
 
 ### Bausteine, die es schon gibt
 
@@ -121,9 +133,9 @@ Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er mu
 
 ### Erste Schritte für die lokale Sitzung
 
-1. Mit `sw_vers` die Version prüfen und danach die API wählen.
-2. Toolchain prüfen bzw. installieren: `xcode-select --install`, Rust (rustup) und Bun.
-3. `bun install`, das VAD-Modell laden (Befehl in `AGENTS.md`) und `bun run tauri dev` als Baseline starten. Bei einem cmake-Fehler `CMAKE_POLICY_VERSION_MINIMUM=3.5` setzen.
-4. **Spike:** Ein minimales Testprogramm, das 10 s System-Ton als WAV aufnimmt, während der Besitzer ein Video abspielt. Prüfen, dass die Datei nicht stumm ist. Erst danach in Handy integrieren.
+1. ~~Mit `sw_vers` die Version prüfen und danach die API wählen.~~ Erledigt: 26.6.2, also Process Taps.
+2. ~~Toolchain prüfen bzw. installieren.~~ Erledigt.
+3. ~~`bun install`, VAD-Modell, `bun run tauri dev` als Baseline.~~ Erledigt.
+4. ~~**Spike:** 10 s System-Ton als WAV.~~ Erledigt, Ton kommt an (siehe oben).
 5. Stufe 1 umsetzen, vom Besitzer mit einem echten Meeting testen lassen, dann Stufe 2.
 6. Vor jedem Commit `bun run lint`, `bun run format`, `cargo clippy` und `bun run check:translations` laufen lassen. Commits mit Conventional-Commit-Präfix (siehe `AGENTS.md`).

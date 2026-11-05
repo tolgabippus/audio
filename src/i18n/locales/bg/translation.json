@@ -5,6 +5,8 @@
     "copyLastTranscript": "Копиране на последния транскрипт",
     "startMeeting": "Start Meeting Recording",
     "stopMeeting": "Stop Meeting Recording",
+    "meetingSpeakerYou": "You",
+    "meetingSpeakerOthers": "Others",
     "unloadModel": "Разтоварване на модела",
     "model": "Модел",
     "quit": "Изход",

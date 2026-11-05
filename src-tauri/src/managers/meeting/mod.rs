@@ -10,6 +10,7 @@
 
 mod system_audio;
 mod track;
+mod transcript;
 
 use anyhow::{anyhow, Result};
 use handy_recorder::{AudioChunk, EndReason, Recorder, RecorderConfig, Sink};
@@ -25,14 +26,20 @@ use tauri_specta::Event;
 use crate::audio_toolkit::{read_wav_samples, save_wav_file};
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::history::{HistoryEntry, HistoryManager};
+use crate::managers::transcription::{
+    ChunkControl, TimedText, Transcription, TranscriptionManager,
+};
 use crate::managers::transcription_jobs::TranscriptionJobManager;
 use crate::notices::{self, Notice, NoticeCode, NoticeSource};
 use system_audio::{SystemAudioCapture, SystemAudioOutcome};
 use track::{mix_tracks, TrackWriter};
+use transcript::{drop_echo, format_transcript, merge_turns, SpeakerLabels};
 
 const MEETINGS_DIR: &str = "meetings";
 const MIC_TRACK: &str = "mic.wav";
 const SYSTEM_TRACK: &str = "system.wav";
+/// The turns of the last transcription, for showing and exporting a meeting.
+const TRANSCRIPT_FILE: &str = "transcript.json";
 /// A meeting's recording is `handy-meeting-<id>.wav`; its tracks are in
 /// `meetings/<id>/`.
 const RECORDING_PREFIX: &str = "handy-meeting-";
@@ -341,21 +348,133 @@ fn source_name(id: &str) -> String {
     format!("Meeting {started}")
 }
 
+/// The folder of the meeting whose recording is `file_name`, if it is one.
+fn tracks_dir(app: &AppHandle, file_name: &str) -> Option<PathBuf> {
+    let id = file_name
+        .strip_prefix(RECORDING_PREFIX)
+        .and_then(|rest| rest.strip_suffix(".wav"))?;
+    let dir = crate::portable::app_data_dir(app)
+        .ok()?
+        .join(MEETINGS_DIR)
+        .join(id);
+    dir.is_dir().then_some(dir)
+}
+
 /// Removes a meeting's tracks along with its History entry.
 pub fn remove_tracks(app: &AppHandle, file_name: &str) {
-    let Some(id) = file_name
-        .strip_prefix(RECORDING_PREFIX)
-        .and_then(|rest| rest.strip_suffix(".wav"))
-    else {
-        return;
-    };
-    let Ok(dir) = crate::portable::app_data_dir(app).map(|d| d.join(MEETINGS_DIR).join(id)) else {
+    let Some(dir) = tracks_dir(app, file_name) else {
         return;
     };
     if let Err(e) = std::fs::remove_dir_all(&dir) {
         if e.kind() != std::io::ErrorKind::NotFound {
             error!("Failed to remove meeting tracks {}: {e}", dir.display());
         }
+    }
+}
+
+/// Transcribes a meeting from its two tracks, so each side keeps its words
+/// and the transcript says who spoke when. `None` when the recording isn't a
+/// meeting with tracks (transcribe its recording instead), `Some(None)` when
+/// `control` stopped it.
+pub fn transcribe_tracks(
+    app: &AppHandle,
+    file_name: &str,
+    control: &dyn ChunkControl,
+) -> Option<Result<Option<Transcription>>> {
+    let dir = tracks_dir(app, file_name)?;
+    Some(transcribe_dir(app, &dir, control))
+}
+
+fn transcribe_dir(
+    app: &AppHandle,
+    dir: &Path,
+    control: &dyn ChunkControl,
+) -> Result<Option<Transcription>> {
+    let read = |name: &str| -> Result<Vec<f32>> {
+        let path = dir.join(name);
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        read_wav_samples(&path).map_err(|e| anyhow!("Failed to load {name}: {e}"))
+    };
+    let microphone = read(MIC_TRACK)?;
+    let system = read(SYSTEM_TRACK)?;
+    let total = microphone.len() + system.len();
+    if total == 0 {
+        return Err(anyhow!("Recording has no audio samples"));
+    }
+
+    let tm = app.state::<Arc<TranscriptionManager>>();
+    let mic_len = microphone.len();
+    let Some(mic) = tm.transcribe_in_chunks_timed(
+        microphone,
+        &Share {
+            inner: control,
+            before: 0,
+            total,
+        },
+    )?
+    else {
+        return Ok(None);
+    };
+    let Some(others) = tm.transcribe_in_chunks_timed(
+        system,
+        &Share {
+            inner: control,
+            before: mic_len,
+            total,
+        },
+    )?
+    else {
+        return Ok(None);
+    };
+
+    // The side that said more decides the language History shows.
+    let language = if spoken_chars(&mic.texts) >= spoken_chars(&others.texts) {
+        mic.language.or(others.language)
+    } else {
+        others.language.or(mic.language)
+    };
+    let turns = merge_turns(drop_echo(mic.texts, &others.texts), others.texts);
+    if let Err(e) = serde_json::to_vec_pretty(&turns)
+        .map_err(anyhow::Error::from)
+        .and_then(|json| std::fs::write(dir.join(TRANSCRIPT_FILE), json).map_err(Into::into))
+    {
+        warn!("Failed to save the meeting's turns: {e}");
+    }
+
+    let strings = crate::tray_i18n::get_tray_translations(Some(
+        crate::settings::get_settings(app).app_language,
+    ));
+    let labels = SpeakerLabels {
+        you: &strings.meeting_speaker_you,
+        others: &strings.meeting_speaker_others,
+    };
+    Ok(Some(Transcription {
+        text: format_transcript(&turns, &labels),
+        language,
+    }))
+}
+
+fn spoken_chars(texts: &[TimedText]) -> usize {
+    texts.iter().map(|t| t.text.len()).sum()
+}
+
+/// One track's part of a meeting's progress: the microphone first, then the
+/// system audio, counted together.
+struct Share<'a> {
+    inner: &'a dyn ChunkControl,
+    before: usize,
+    total: usize,
+}
+
+impl ChunkControl for Share<'_> {
+    fn proceed(&self) -> bool {
+        self.inner.proceed()
+    }
+
+    fn progress(&self, done: usize, _total: usize) {
+        self.inner.progress(self.before + done, self.total);
     }
 }
 

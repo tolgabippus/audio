@@ -19,6 +19,7 @@ use tauri_specta::Event;
 use crate::actions::process_transcription_output;
 use crate::audio_toolkit::{decode_audio_file, read_wav_samples, save_wav_file};
 use crate::managers::history::{HistoryEntry, HistoryManager};
+use crate::managers::meeting;
 use crate::managers::transcription::{
     panic_payload_message, ChunkControl, Transcription, TranscriptionManager,
 };
@@ -316,11 +317,6 @@ impl TranscriptionJobManager {
         let tm = Arc::clone(&self.app.state::<Arc<TranscriptionManager>>());
         let entry = tauri::async_runtime::block_on(hm.get_entry_by_id(entry_id))?
             .ok_or_else(|| anyhow!("History entry {} not found", entry_id))?;
-        let samples = read_wav_samples(hm.get_audio_file_path(&entry.file_name))
-            .map_err(|e| anyhow!("Failed to load audio: {}", e))?;
-        if samples.is_empty() {
-            return Err(anyhow!("Recording has no audio samples"));
-        }
 
         let control = Control {
             manager: self,
@@ -328,8 +324,21 @@ impl TranscriptionJobManager {
             cancelled,
             percent: Cell::new(0),
         };
-        let Some(Transcription { text, language }) = tm.transcribe_in_chunks(samples, &control)?
-        else {
+        // A meeting is transcribed from its tracks, so the transcript says
+        // who spoke; anything else from its recording.
+        let transcription = match meeting::transcribe_tracks(&self.app, &entry.file_name, &control)
+        {
+            Some(result) => result?,
+            None => {
+                let samples = read_wav_samples(hm.get_audio_file_path(&entry.file_name))
+                    .map_err(|e| anyhow!("Failed to load audio: {}", e))?;
+                if samples.is_empty() {
+                    return Err(anyhow!("Recording has no audio samples"));
+                }
+                tm.transcribe_in_chunks(samples, &control)?
+            }
+        };
+        let Some(Transcription { text, language }) = transcription else {
             return Ok(JobEnd::Cancelled);
         };
         if text.is_empty() {

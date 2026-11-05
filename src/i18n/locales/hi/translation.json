@@ -5,6 +5,8 @@
     "copyLastTranscript": "पिछला ट्रांसक्रिप्ट कॉपी करें",
     "startMeeting": "Start Meeting Recording",
     "stopMeeting": "Stop Meeting Recording",
+    "meetingSpeakerYou": "You",
+    "meetingSpeakerOthers": "Others",
     "unloadModel": "मॉडल अनलोड करें",
     "model": "मॉडल",
     "quit": "बाहर निकलें",

@@ -5,6 +5,8 @@
     "copyLastTranscript": "最新の文字起こしをコピー",
     "startMeeting": "Start Meeting Recording",
     "stopMeeting": "Stop Meeting Recording",
+    "meetingSpeakerYou": "You",
+    "meetingSpeakerOthers": "Others",
     "unloadModel": "モデルをアンロード",
     "model": "モデル",
     "quit": "終了",

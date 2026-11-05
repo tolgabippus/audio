@@ -40,7 +40,7 @@ mod job;
 mod live;
 pub mod policy;
 
-pub use job::ChunkControl;
+pub use job::{ChunkControl, TimedText};
 
 const STREAM_PERF_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -1399,8 +1399,8 @@ fn join_chunks(transcripts: Vec<Transcript>) -> (String, Option<String>) {
 }
 
 /// The language every chunk's model reported, if they all agree.
-fn agreed_language(transcripts: &[Transcript]) -> Option<String> {
-    let mut detected = transcripts.iter().map(|t| t.language.clone());
+fn agreed_language<'a>(transcripts: impl IntoIterator<Item = &'a Transcript>) -> Option<String> {
+    let mut detected = transcripts.into_iter().map(|t| t.language.clone());
     detected
         .next()
         .flatten()

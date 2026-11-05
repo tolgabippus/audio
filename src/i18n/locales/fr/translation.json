@@ -5,6 +5,8 @@
     "copyLastTranscript": "Copier la dernière transcription",
     "startMeeting": "Start Meeting Recording",
     "stopMeeting": "Stop Meeting Recording",
+    "meetingSpeakerYou": "You",
+    "meetingSpeakerOthers": "Others",
     "unloadModel": "Décharger le modèle",
     "model": "Modèle",
     "quit": "Quitter",

@@ -5,6 +5,8 @@
     "copyLastTranscript": "Letzte Transkription kopieren",
     "startMeeting": "Meeting-Aufnahme starten",
     "stopMeeting": "Meeting-Aufnahme stoppen",
+    "meetingSpeakerYou": "Du",
+    "meetingSpeakerOthers": "Andere",
     "unloadModel": "Modell entladen",
     "model": "Modell",
     "quit": "Beenden",

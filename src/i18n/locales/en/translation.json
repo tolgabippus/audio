@@ -766,7 +766,7 @@
       "updateChecks": {
         "label": "Check for Updates",
         "description": "Automatically check for new versions of Handy",
-        "lockedDescription": "Disabled by system configuration (HANDY_DISABLE_UPDATER)"
+        "lockedDescription": "Off in this fork: an update would install the official Handy and remove this fork's own features, such as meeting recording."
       },
       "whatsNewPreview": {
         "title": "Preview What's New",

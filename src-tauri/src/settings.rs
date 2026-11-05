@@ -1395,13 +1395,20 @@ fn os_languages() -> &'static [String] {
     }
 }
 
-/// Update checks are forced off (without touching the persisted setting) when
-/// `HANDY_DISABLE_UPDATER` is set — e.g. by the Nix package, since self-update
-/// can't work against an immutable /nix/store install.
+/// This fork's builds never update themselves: the updater installs the
+/// official cjpais/Handy release, which would replace the fork and drop its
+/// own features, such as meeting recording.
+const FORK_DISABLES_UPDATER: bool = true;
+
+/// Update checks are forced off (without touching the persisted setting) in
+/// this fork, and when `HANDY_DISABLE_UPDATER` is set — e.g. by the Nix
+/// package, since self-update can't work against an immutable /nix/store
+/// install.
 pub fn update_checks_forced_disabled() -> bool {
     use std::sync::OnceLock;
     static IS_UPDATER_DISABLED: OnceLock<bool> = OnceLock::new();
-    *IS_UPDATER_DISABLED.get_or_init(|| utils::env_flag_enabled("HANDY_DISABLE_UPDATER"))
+    *IS_UPDATER_DISABLED
+        .get_or_init(|| FORK_DISABLES_UPDATER || utils::env_flag_enabled("HANDY_DISABLE_UPDATER"))
 }
 
 /// Effective updater state: the user's stored preference, overridden to `false`
@@ -1447,6 +1454,15 @@ pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_fork_never_checks_for_official_updates() {
+        let mut settings = get_default_settings();
+        settings.update_checks_enabled = true;
+
+        assert!(update_checks_forced_disabled());
+        assert!(!update_checks_effectively_enabled(&settings));
+    }
 
     #[test]
     fn stored_binding_returns_the_requested_binding() {

@@ -766,7 +766,7 @@
       "updateChecks": {
         "label": "Nach Updates suchen",
         "description": "Automatisch nach neuen Versionen von Handy suchen",
-        "lockedDescription": "Durch Systemkonfiguration deaktiviert (HANDY_DISABLE_UPDATER)"
+        "lockedDescription": "In diesem Fork aus: Ein Update würde das offizielle Handy installieren und die eigenen Funktionen wie die Meeting-Aufnahme entfernen."
       },
       "whatsNewPreview": {
         "title": "Vorschau der Neuerungen",

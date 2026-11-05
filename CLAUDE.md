@@ -81,7 +81,7 @@ Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er mu
 
 **Ziel:** Handy soll Meetings (Zoom, Teams, Meet usw.) mitschneiden, mit **System-Ton und Mikrofon gleichzeitig**. Danach wird automatisch transkribiert und das Ergebnis landet im Verlauf. Das normale Diktieren muss unabhängig davon weiter funktionieren.
 
-**Status:** Stufe 1 ist umgesetzt (2026-11-04), aber **noch nicht mit einem echten Meeting getestet**. Stufe 2 ist offen. Die Umsetzung passiert **lokal auf dem Mac**, weil die macOS-Teile in der Cloud (Linux) weder gebaut noch getestet werden können.
+**Status:** Stufe 1 ist umgesetzt und vom Besitzer erfolgreich getestet (2026-11-04, Test mit YouTube-Video, noch kein echtes Zoom- oder Teams-Meeting). Stufe 2 ist offen. Die Umsetzung passiert **lokal auf dem Mac**, weil die macOS-Teile in der Cloud (Linux) weder gebaut noch getestet werden können.
 
 ### Umsetzung Stufe 1 (so ist es gebaut)
 
@@ -98,7 +98,14 @@ Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er mu
 - Texte: Deutsch und Englisch übersetzt, die anderen 24 Sprachen vorerst mit englischem Text.
 - `Info.plist`: `NSAudioCaptureUsageDescription` ergänzt.
 - Bekannte Grenzen: Mit „Stummschalten während der Aufnahme“ ist auch die System-Spur stumm, solange man nebenher diktiert. Echo ohne Kopfhörer wird nicht entfernt. Mehrere Ausgabegeräte gleichzeitig (Multi-Output) sind nicht getestet. Auf Linux kann `cpal` (ALSA) keinen Loopback, dort kommt die Warnung „ohne System-Ton“.
-- **Testen nur als echte App:** `tauri dev` startet keine `.app`, dann fragt macOS die Berechtigung für den falschen Prozess ab. Bauen mit `CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app -c '{"bundle":{"createUpdaterArtifacts":false}}'` und `src-tauri/target/release/bundle/macos/Handy.app` per `open` starten. Ein Debug-Bundle scheitert, weil es beim Start `../src/bindings.ts` relativ zum Arbeitsverzeichnis schreiben will.
+- **Testen nur als echte App:** `tauri dev` startet keine `.app`, dann fragt macOS die Berechtigung für den falschen Prozess ab. Ein Debug-Bundle scheitert, weil es beim Start `../src/bindings.ts` relativ zum Arbeitsverzeichnis schreiben will. So bauen und starten:
+  ```bash
+  export APPLE_SIGNING_IDENTITY="$(security find-identity -v -p codesigning | grep -m1 'Apple Development' | awk '{print $2}')"
+  CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app -c '{"bundle":{"createUpdaterArtifacts":false}}'
+  open src-tauri/target/release/bundle/macos/Handy.app
+  ```
+  Der Besitzer hat ein „Apple Development“-Zertifikat im Schlüsselbund. Damit signiert, bleibt die Identität der App über Neubauten gleich, und macOS behält die Erlaubnisse für Mikrofon, Bedienungshilfen und System-Ton. Mit der Ad-hoc-Signatur (`signingIdentity: "-"` in `tauri.conf.json`, ohne die Variable) muss man nach jedem Neubau neu erlauben. Mit `tccutil reset Accessibility com.pais.handy` lässt sich eine hängende Freigabe zurücksetzen; erteilen geht nur in den Systemeinstellungen.
+- **Keine offiziellen Updates:** `FORK_DISABLES_UPDATER` in `settings.rs` sperrt die Update-Suche fest, über denselben Schalter wie `HANDY_DISABLE_UPDATER`. Sonst würde der Updater das offizielle cjpais/Handy installieren und den Fork samt Meeting-Aufnahme ersetzen.
 
 ### Ergebnis des Spikes (2026-11-04, macOS 26.6.2)
 

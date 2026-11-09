@@ -150,10 +150,17 @@ Der Hook bekommt nicht den Shell-`PATH`, deshalb absolute Pfade verwenden. Er mu
 - **Die eigene Stimme fehlte im Text**, weil der Besitzer gleichzeitig mit dem Video sprach. In der Mischung gewinnt eine Stimme. Das ist das stärkste Argument für Stufe 2.
 - Mit AirPods als Mikrofon wechselt macOS in den Headset-Modus: Der System-Ton kommt dann mit 24 kHz mono statt 48 kHz stereo. Für die Spracherkennung reicht das.
 
+### Umsetzung Stufe 2 (2a–2d, 2026-11-09, noch nicht vom Besitzer getestet)
+
+- **2a „Du“ und „Andere“:** `meeting/transcript.rs` und `transcribe_tracks` in `meeting/mod.rs`. Beide Spuren werden einzeln mit `transcribe_in_chunks_timed` (`transcription/job.rs`, Segment-Zeitstempel von transcribe-cpp) transkribiert, Echo wird entfernt (`drop_echo`), danach nach Zeit gemischt. Ergebnis: Text `[hh:mm:ss] Du: …` im Verlauf und `meetings/<id>/transcript.json`.
+- **2b Meetings als eigene Einträge:** `meeting/records.rs`. Eigene Tabellen `meetings`, `meeting_topics`, `meeting_settings` in `history.db`, angelegt mit `CREATE TABLE IF NOT EXISTS` und **ohne** `user_version` zu erhöhen, damit ein offizielles Handy die Datenbank weiter öffnet. Bestehende Meetings übernimmt `adopt_existing` beim Start. Die Art `online` oder `on_site` steht im Meeting; vor Ort wird nur das Mikrofon aufgenommen. Shortcut und Tray starten mit Art und Thema der letzten Aufnahme von der Meeting-Seite. Ein Titel benennt auch den Verlaufseintrag um (`HistoryManager::set_source_name`). Meetings zählen nicht zum Verlaufslimit, das galt schon für alle Datei-Einträge.
+- **2c Oberfläche:** `src/components/settings/meeting/`: `RecordPanel` (Art, Thema, Titel), `MeetingList` (Suche, Themenfilter), `MeetingDetail` (Details bearbeiten, Audio, farbige Sprecher, Klick auf eine Zeit spielt ab, erneut transkribieren, exportieren, löschen), `TopicsPanel`, `ExportPanel`. Reine Logik in `meetings.ts` mit `meetings.test.ts`.
+- **2d Obsidian-Export:** `meeting/export.rs`. Pro Meeting `<Ordner>/<Thema oder „Ohne Thema“>/<JJJJ-MM-TT HH-MM> <Titel>.md` mit YAML-Frontmatter (title, date, duration_minutes, type, topic, participants, tags, handy_id), Notizen und Transkript. Automatisch nach jeder Transkription und Änderung, sobald ein Ordner gesetzt ist, außerdem per Knopf. Eine umbenannte Notiz ersetzt die alte (`export_path`). Fehler kommen als Notice `MeetingExportFailed`. Der Ordner steht in `meeting_settings`, nicht in `settings.rs`, damit es weniger Merge-Konflikte mit Upstream gibt. Git läuft über das Obsidian-Plugin „Obsidian Git“, nicht über Handy.
+- Nach dem Umbenennen oder Löschen eines Themas bleiben exportierte Notizen im alten Ordner, bis man „Alle neu exportieren“ klickt.
+
 ### Ideen des Besitzers für später (Reihenfolge offen)
 
-- **Stufe 2:** getrennte Spuren „Du“ und „Andere“ (siehe oben).
-- **Meetings im Verlauf einheitlich kategorisieren:** eigene Ansicht oder einen Filter „Meetings“, Titel umbenennen, eventuell Tags oder Ordner. Heute erkennt man Meetings nur am `file_name`-Präfix `handy-meeting-` bzw. am `source_name` „Meeting …“. Für echte Kategorien braucht es eine eigene Spalte oder Tabelle in `history.db` (Migration in `managers/history.rs`).
+- ~~Stufe 2~~ und ~~Meetings kategorisieren~~: umgesetzt, siehe oben.
 - **Zusammenfassung mit den wichtigsten Punkten und Aufgaben** über die vorhandene LLM-Nachbearbeitung (`llm_client.rs`, Anbieter in `settings.rs`). Der Anbieter `custom` zeigt standardmäßig auf `http://localhost:11434/v1` (Ollama), damit bliebe auch der Text lokal. Apple Intelligence gibt es nur auf Apple Silicon. Ein eigener Prompt für Meetings, getrennt vom Diktier-Prompt, und ein langes Transkript müssen eventuell in Teilen zusammengefasst werden.
 - **Bedienung allgemein ausbauen**, zum Beispiel eine Meeting-Detailansicht mit Transkript, Zusammenfassung und Audio.
 

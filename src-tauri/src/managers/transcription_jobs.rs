@@ -365,6 +365,7 @@ impl TranscriptionJobManager {
             processed.post_process_prompt,
             language,
         )?;
+        meeting::export_quietly(&self.app, &entry.file_name);
         Ok(JobEnd::Finished {
             post_process_failed,
         })

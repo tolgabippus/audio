@@ -1,16 +1,25 @@
 //! Meeting recording: the microphone ("you") and the system audio ("the
-//! others") at once, each written to its own track as it arrives. Stopping
-//! mixes the tracks into one recording and queues it as a file
-//! transcription, so the result lands in History.
+//! others") at once, each written to its own track as it arrives. An on-site
+//! meeting records only the microphone. Stopping mixes the tracks into one
+//! recording and queues it as a file transcription, so the result lands in
+//! History. Each meeting also has details (title, topic, …) in
+//! [`records`], and can be exported as a Markdown note ([`export`]).
 //!
 //! Tracks live in `<app data>/meetings/<id>/` until their recording exists;
 //! a meeting cut short by a crash is imported on the next start. They are
 //! kept after that for transcribing each side on its own, and removed with
 //! their History entry.
 
+mod export;
+mod records;
 mod system_audio;
 mod track;
 mod transcript;
+
+pub use records::{
+    Meeting, MeetingDetails, MeetingKind, MeetingRecords, MeetingStartOptions, MeetingTopic,
+};
+pub use transcript::Turn;
 
 use anyhow::{anyhow, Result};
 use handy_recorder::{AudioChunk, EndReason, Recorder, RecorderConfig, Sink};
@@ -31,6 +40,7 @@ use crate::managers::transcription::{
 };
 use crate::managers::transcription_jobs::TranscriptionJobManager;
 use crate::notices::{self, Notice, NoticeCode, NoticeSource};
+use export::{note_path, render_note, ExportLabels};
 use system_audio::{SystemAudioCapture, SystemAudioOutcome};
 use track::{mix_tracks, TrackWriter};
 use transcript::{drop_echo, format_transcript, merge_turns, SpeakerLabels};
@@ -43,6 +53,8 @@ const TRANSCRIPT_FILE: &str = "transcript.json";
 /// A meeting's recording is `handy-meeting-<id>.wav`; its tracks are in
 /// `meetings/<id>/`.
 const RECORDING_PREFIX: &str = "handy-meeting-";
+const HISTORY_DB: &str = "history.db";
+const SAMPLES_PER_MS: usize = 16;
 
 /// Whether a meeting is being recorded, and since when.
 #[derive(
@@ -60,20 +72,34 @@ struct Active {
     started_at_ms: i64,
     /// Why the microphone isn't recording, when it isn't.
     microphone: Result<Recorder<MicSink>, String>,
-    system: SystemAudioCapture,
+    /// `None` on site, where only the microphone records.
+    system: Option<SystemAudioCapture>,
 }
 
 pub struct MeetingManager {
     app: AppHandle,
     active: Mutex<Option<Active>>,
+    records: MeetingRecords,
 }
 
 impl MeetingManager {
     pub fn new(app: &AppHandle) -> Arc<Self> {
+        let db_path = match crate::portable::app_data_dir(app) {
+            Ok(dir) => dir.join(HISTORY_DB),
+            Err(e) => {
+                error!("Failed to find the app data folder for meetings: {e}");
+                PathBuf::from(HISTORY_DB)
+            }
+        };
         Arc::new(Self {
             app: app.clone(),
             active: Mutex::new(None),
+            records: MeetingRecords::new(db_path),
         })
+    }
+
+    pub fn records(&self) -> &MeetingRecords {
+        &self.records
     }
 
     fn lock(&self) -> MutexGuard<'_, Option<Active>> {
@@ -100,9 +126,10 @@ impl MeetingManager {
         Ok(crate::portable::app_data_dir(&self.app)?.join(MEETINGS_DIR))
     }
 
-    /// Starts recording. The microphone failing to open is only a warning:
-    /// the system audio still makes a useful recording.
-    pub fn start(&self) -> Result<MeetingState> {
+    /// Starts recording. Online, the microphone failing to open is only a
+    /// warning: the system audio still makes a useful recording. On site it
+    /// is all there is, so the meeting doesn't start.
+    pub fn start(&self, options: MeetingStartOptions) -> Result<MeetingState> {
         let mut active = self.lock();
         if active.is_some() {
             return Err(anyhow!("A meeting is already being recorded"));
@@ -113,11 +140,28 @@ impl MeetingManager {
         let dir = self.meetings_dir()?.join(&id);
         std::fs::create_dir_all(&dir)?;
 
-        let system = SystemAudioCapture::start(dir.join(SYSTEM_TRACK), started)?;
+        let online = options.kind == MeetingKind::Online;
+        let system = if online {
+            Some(SystemAudioCapture::start(dir.join(SYSTEM_TRACK), started)?)
+        } else {
+            None
+        };
         let microphone = self
             .open_microphone(&dir, started)
             .map_err(|e| e.to_string());
+        if let (None, Err(problem)) = (&system, &microphone) {
+            let _ = std::fs::remove_dir_all(&dir);
+            return Err(anyhow!("{problem}"));
+        }
         let microphone_problem = microphone.as_ref().err().cloned();
+
+        if let Err(e) = self
+            .records
+            .insert(&id, &recording_file_name(&id), started_at_ms, &options)
+            .and_then(|()| self.records.remember_start_options(&options))
+        {
+            warn!("Failed to save the meeting's details: {e}");
+        }
 
         info!("Started meeting recording {id}");
         *active = Some(Active {
@@ -170,8 +214,8 @@ impl MeetingManager {
             Ok(recorder) => stop_microphone(recorder),
             Err(problem) => Some(problem.clone()),
         };
-        let system = active.system.finish();
-        if system.dropped_packets > 0 {
+        let system = active.system.map(SystemAudioCapture::finish);
+        if let Some(system) = system.as_ref().filter(|s| s.dropped_packets > 0) {
             warn!(
                 "System audio lost {} packets during the meeting",
                 system.dropped_packets
@@ -183,7 +227,7 @@ impl MeetingManager {
             Ok(_) => {
                 // Clear first, so a warning about this meeting survives it.
                 notices::clear(&self.app, NoticeSource::Meeting);
-                if let Some(problem) = system_problem(&system) {
+                if let Some(problem) = system.as_ref().and_then(system_problem) {
                     self.warn(NoticeCode::MeetingNoSystemAudio, problem);
                 } else if let Some(problem) = microphone_problem {
                     self.warn(NoticeCode::MeetingNoMicrophone, problem);
@@ -209,10 +253,15 @@ impl MeetingManager {
         );
     }
 
-    /// Starts recording, or stops a recording on its own thread.
+    /// Starts recording the way the Meeting page last did, or stops a
+    /// recording on its own thread.
     pub fn toggle(self: &Arc<Self>) {
         if !self.is_recording() {
-            if let Err(e) = self.start() {
+            let options = self.records.last_start_options().unwrap_or_else(|e| {
+                warn!("Failed to read how the last meeting started: {e}");
+                MeetingStartOptions::default()
+            });
+            if let Err(e) = self.start(options) {
                 error!("Failed to start meeting recording: {e}");
                 notices::raise(
                     &self.app,
@@ -247,6 +296,10 @@ impl MeetingManager {
 
         let hm = self.app.state::<Arc<HistoryManager>>();
         let file_name = recording_file_name(id);
+        let duration_ms = (mixed.len() / SAMPLES_PER_MS) as i64;
+        if let Err(e) = self.records.finish(id, &file_name, duration_ms) {
+            warn!("Failed to save the meeting's length: {e}");
+        }
         let recording = hm.get_audio_file_path(&file_name);
         // Written aside and renamed: the recording's existence is what marks
         // the meeting as imported.
@@ -257,7 +310,7 @@ impl MeetingManager {
 
         self.app
             .state::<Arc<TranscriptionJobManager>>()
-            .transcribe_recording(file_name, source_name(id))
+            .transcribe_recording(file_name, self.history_name(id))
     }
 
     /// Imports meetings a crash or quit cut short. Runs once at startup.
@@ -269,6 +322,12 @@ impl MeetingManager {
             return;
         };
         let hm = self.app.state::<Arc<HistoryManager>>();
+        if let Err(e) = self
+            .records
+            .adopt_existing(hm.recordings_dir(), RECORDING_PREFIX)
+        {
+            warn!("Failed to add details for earlier meetings: {e}");
+        }
         for entry in entries.flatten() {
             let id = entry.file_name().to_string_lossy().into_owned();
             let path = entry.path();
@@ -287,6 +346,31 @@ impl MeetingManager {
                 Err(e) => warn!("Failed to recover unfinished meeting {id}: {e}"),
             }
         }
+    }
+
+    /// What History calls the meeting: its title, or its start.
+    fn history_name(&self, id: &str) -> String {
+        match self.records.get(id) {
+            Ok(Some(meeting)) if !meeting.title.trim().is_empty() => {
+                meeting.title.trim().to_string()
+            }
+            _ => source_name(id),
+        }
+    }
+
+    /// Saves the meeting's details, renames it in History and updates its
+    /// exported note.
+    pub fn update_details(&self, id: &str, details: &MeetingDetails) -> Result<Meeting> {
+        let meeting = self.records.update(id, details)?;
+        if let Err(e) = self
+            .app
+            .state::<Arc<HistoryManager>>()
+            .set_source_name(&meeting.file_name, &self.history_name(id))
+        {
+            warn!("Failed to rename meeting {id} in History: {e}");
+        }
+        export_quietly(&self.app, &meeting.file_name);
+        Ok(meeting)
     }
 
     fn changed(&self) {
@@ -360,8 +444,18 @@ fn tracks_dir(app: &AppHandle, file_name: &str) -> Option<PathBuf> {
     dir.is_dir().then_some(dir)
 }
 
-/// Removes a meeting's tracks along with its History entry.
+/// Removes a meeting's tracks and details along with its History entry.
+/// An exported note stays: it belongs to the vault now.
 pub fn remove_tracks(app: &AppHandle, file_name: &str) {
+    if file_name.starts_with(RECORDING_PREFIX) {
+        if let Err(e) = app
+            .state::<Arc<MeetingManager>>()
+            .records
+            .remove_by_file_name(file_name)
+        {
+            error!("Failed to remove the details of {file_name}: {e}");
+        }
+    }
     let Some(dir) = tracks_dir(app, file_name) else {
         return;
     };
@@ -454,6 +548,96 @@ fn transcribe_dir(
         text: format_transcript(&turns, &labels),
         language,
     }))
+}
+
+/// The meeting's transcript by speaker, if it was transcribed from its
+/// tracks.
+pub fn turns(app: &AppHandle, meeting: &Meeting) -> Result<Option<Vec<Turn>>> {
+    let Some(dir) = tracks_dir(app, &meeting.file_name) else {
+        return Ok(None);
+    };
+    let path = dir.join(TRANSCRIPT_FILE);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let json = std::fs::read(&path)?;
+    Ok(Some(serde_json::from_slice(&json)?))
+}
+
+/// Writes the meeting's note into the export folder, replacing the note it
+/// wrote before (which moves when the title or topic changes). The note's
+/// path; `None` without an export folder.
+pub fn export(app: &AppHandle, id: &str) -> Result<Option<PathBuf>> {
+    let records = &app.state::<Arc<MeetingManager>>().records;
+    let Some(dir) = records.export_dir()? else {
+        return Ok(None);
+    };
+    let meeting = records
+        .get(id)?
+        .ok_or_else(|| anyhow!("Meeting {id} not found"))?;
+    let topic = records.topic_name(meeting.topic_id)?;
+    let turns = turns(app, &meeting).unwrap_or_else(|e| {
+        warn!("Failed to read the turns of meeting {id}: {e}");
+        None
+    });
+    let strings = crate::tray_i18n::get_tray_translations(Some(
+        crate::settings::get_settings(app).app_language,
+    ));
+    let labels = ExportLabels {
+        you: &strings.meeting_speaker_you,
+        others: &strings.meeting_speaker_others,
+        untitled: &strings.meeting_untitled,
+        no_topic: &strings.meeting_no_topic,
+        notes: &strings.meeting_notes,
+        transcript: &strings.meeting_transcript,
+    };
+
+    let path = note_path(&dir, &meeting, topic.as_deref(), &labels);
+    let note = render_note(&meeting, topic.as_deref(), turns.as_deref(), &labels);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, note)?;
+    if let Some(previous) = records.export_path(id)?.filter(|p| *p != path) {
+        remove_previous_note(&previous);
+    }
+    records.set_export_path(id, &path)?;
+    info!("Exported meeting {id} to {}", path.display());
+    Ok(Some(path))
+}
+
+fn remove_previous_note(path: &Path) {
+    if let Err(e) = std::fs::remove_file(path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            warn!("Failed to remove the old note {}: {e}", path.display());
+        }
+    }
+}
+
+/// Exports the meeting recorded as `file_name` if there is an export folder,
+/// after its transcript or details changed. A failure is a warning: the
+/// meeting itself is fine.
+pub fn export_quietly(app: &AppHandle, file_name: &str) {
+    if !file_name.starts_with(RECORDING_PREFIX) {
+        return;
+    }
+    let records = &app.state::<Arc<MeetingManager>>().records;
+    let meeting = match records.by_file_name(file_name) {
+        Ok(Some(meeting)) => meeting,
+        Ok(None) => return,
+        Err(e) => {
+            warn!("Failed to read the meeting {file_name}: {e}");
+            return;
+        }
+    };
+    if let Err(e) = export(app, &meeting.id) {
+        warn!("Failed to export meeting {}: {e}", meeting.id);
+        notices::raise(
+            app,
+            Notice::new(NoticeCode::MeetingExportFailed, NoticeSource::Meeting)
+                .with_detail(e.to_string()),
+        );
+    }
 }
 
 fn spoken_chars(texts: &[TimedText]) -> usize {

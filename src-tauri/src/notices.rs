@@ -53,6 +53,8 @@ pub enum NoticeCode {
     MeetingRecordingFailed,
     MeetingNoSystemAudio,
     MeetingNoMicrophone,
+    /// A meeting couldn't be written to the export folder.
+    MeetingExportFailed,
 }
 
 impl NoticeCode {
@@ -69,7 +71,8 @@ impl NoticeCode {
             Self::PostProcessFailed
             | Self::FilePostProcessFailed
             | Self::MeetingNoSystemAudio
-            | Self::MeetingNoMicrophone => NoticeLevel::Warning,
+            | Self::MeetingNoMicrophone
+            | Self::MeetingExportFailed => NoticeLevel::Warning,
         }
     }
 
@@ -88,6 +91,7 @@ impl NoticeCode {
             Self::MeetingRecordingFailed => &strings.meeting_recording_failed_title,
             Self::MeetingNoSystemAudio => &strings.meeting_no_system_audio_title,
             Self::MeetingNoMicrophone => &strings.meeting_no_microphone_title,
+            Self::MeetingExportFailed => &strings.meeting_export_failed_title,
         }
     }
 }

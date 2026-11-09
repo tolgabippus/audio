@@ -1010,11 +1010,11 @@ async getMeetingState() : Promise<MeetingState> {
     return await TAURI_INVOKE("get_meeting_state");
 },
 /**
- * Starts recording the microphone and system audio.
+ * Starts recording: the microphone, and online also the system audio.
  */
-async startMeeting() : Promise<Result<MeetingState, string>> {
+async startMeeting(options: MeetingStartOptions) : Promise<Result<MeetingState, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_meeting") };
+    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { options }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1026,6 +1026,128 @@ async startMeeting() : Promise<Result<MeetingState, string>> {
 async stopMeeting() : Promise<Result<HistoryEntry, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("stop_meeting") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How the last meeting started from the Meeting page; the page's defaults.
+ */
+async getLastMeetingOptions() : Promise<Result<MeetingStartOptions, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_last_meeting_options") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every recorded meeting, newest first.
+ */
+async listMeetings() : Promise<Result<Meeting[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_meetings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The meeting's transcript by speaker; `None` if it has none yet, or was
+ * transcribed before speakers were told apart.
+ */
+async getMeetingTurns(id: string) : Promise<Result<Turn[] | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_turns", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateMeeting(id: string, details: MeetingDetails) : Promise<Result<Meeting, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_meeting", { id, details }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listMeetingTopics() : Promise<Result<MeetingTopic[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_meeting_topics") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createMeetingTopic(name: string) : Promise<Result<MeetingTopic, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_meeting_topic", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameMeetingTopic(id: number, name: string) : Promise<Result<MeetingTopic, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_meeting_topic", { id, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Deletes the topic. Its meetings stay, without a topic. Exported notes
+ * stay where they are until a meeting is exported again.
+ */
+async deleteMeetingTopic(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_meeting_topic", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The folder meetings are exported to, such as an Obsidian vault.
+ */
+async getMeetingExportDir() : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_export_dir") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Sets the export folder; `None` stops exporting.
+ */
+async setMeetingExportDir(dir: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_export_dir", { dir }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Writes the meeting's note again; the note's path.
+ */
+async exportMeeting(id: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_meeting", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Writes every meeting's note again; how many were written.
+ */
+async exportAllMeetings() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_all_meetings") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1330,6 +1452,43 @@ export type LanguageStatus =
 { kind: "auto_unavailable"; language: string; reason: AutoUnavailableReason }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 /**
+ * A meeting as the Meeting page lists it.
+ */
+export type Meeting = { id: string; 
+/**
+ * Its recording, as History knows it.
+ */
+file_name: string; 
+/**
+ * Its History entry; `None` once that is deleted.
+ */
+history_id: number | null; title: string; topic_id: number | null; kind: MeetingKind; started_at_ms: number; duration_ms: number; participants: string; notes: string; 
+/**
+ * The transcript History shows; empty until it is transcribed.
+ */
+transcript: string }
+/**
+ * What the user can change about a meeting.
+ */
+export type MeetingDetails = { title: string; topic_id: number | null; kind: MeetingKind; participants: string; notes: string }
+/**
+ * Where a meeting took place, which decides what is recorded.
+ */
+export type MeetingKind = 
+/**
+ * A call: the microphone and the system audio.
+ */
+"online" | 
+/**
+ * Everyone in one room: only the microphone.
+ */
+"on_site"
+/**
+ * How the next meeting starts: from the Meeting page, or the shortcut and
+ * tray, which reuse what the page last started with.
+ */
+export type MeetingStartOptions = { kind: MeetingKind; topic_id: number | null; title: string }
+/**
  * Whether a meeting is being recorded, and since when.
  */
 export type MeetingState = { recording: boolean; 
@@ -1337,6 +1496,7 @@ export type MeetingState = { recording: boolean;
  * Unix milliseconds; set while recording.
  */
 started_at_ms: number | null }
+export type MeetingTopic = { id: number; name: string }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 /**
@@ -1372,7 +1532,11 @@ detail: string | null }
 /**
  * The frontend maps each code to its text in `src/lib/notices.ts`.
  */
-export type NoticeCode = "TranscriptionFailed" | "PasteFailed" | "NoMicrophone" | "MicPermissionDenied" | "RecordingFailed" | "ModelLoadFailed" | "PostProcessFailed" | "FileTranscriptionFailed" | "FilePostProcessFailed" | "MeetingRecordingFailed" | "MeetingNoSystemAudio" | "MeetingNoMicrophone"
+export type NoticeCode = "TranscriptionFailed" | "PasteFailed" | "NoMicrophone" | "MicPermissionDenied" | "RecordingFailed" | "ModelLoadFailed" | "PostProcessFailed" | "FileTranscriptionFailed" | "FilePostProcessFailed" | "MeetingRecordingFailed" | "MeetingNoSystemAudio" | "MeetingNoMicrophone" | 
+/**
+ * A meeting couldn't be written to the export folder.
+ */
+"MeetingExportFailed"
 export type NoticeLevel = 
 /**
  * Nothing came out, or Handy can't do its job.
@@ -1503,6 +1667,15 @@ export type ShortcutActivation =
 "hold_or_toggle"
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
+export type Speaker = 
+/**
+ * The microphone.
+ */
+"you" | 
+/**
+ * The system audio: everyone else in the call.
+ */
+"others"
 /**
  * Phase of the streaming overlay card, emitted to drive its UI state.
  */
@@ -1582,6 +1755,11 @@ export type TranscriptionOutcome =
  * Transcribing or pasting failed.
  */
 "failed"
+/**
+ * One speaker's words, from the start of their first stretch to the end of
+ * their last.
+ */
+export type Turn = { speaker: Speaker; start_ms: number; end_ms: number; text: string }
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
 export type VadBackend = "silero" | "earshot"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }

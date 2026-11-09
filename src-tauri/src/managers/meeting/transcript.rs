@@ -4,6 +4,7 @@
 //! speech survives, which a mixed recording loses.
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::collections::HashSet;
 
 use crate::managers::transcription::TimedText;
@@ -21,7 +22,7 @@ const MS_PER_SECOND: u64 = 1000;
 const SECONDS_PER_MINUTE: u64 = 60;
 const SECONDS_PER_HOUR: u64 = 3600;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]
 pub enum Speaker {
     /// The microphone.
@@ -32,7 +33,7 @@ pub enum Speaker {
 
 /// One speaker's words, from the start of their first stretch to the end of
 /// their last.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct Turn {
     pub speaker: Speaker,
     pub start_ms: u64,
@@ -140,7 +141,7 @@ pub fn format_transcript(turns: &[Turn], labels: &SpeakerLabels) -> String {
         .join("\n\n")
 }
 
-fn format_time(ms: u64) -> String {
+pub(super) fn format_time(ms: u64) -> String {
     let seconds = ms / MS_PER_SECOND;
     format!(
         "{:02}:{:02}:{:02}",

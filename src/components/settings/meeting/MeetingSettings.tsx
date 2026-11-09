@@ -1,87 +1,55 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Circle, Headphones, ShieldCheck, Volume2 } from "lucide-react";
-import { commands, events, type MeetingState } from "@/bindings";
-import { notify } from "@/stores/noticeStore";
+import { Headphones, ShieldCheck, Volume2 } from "lucide-react";
+import { commands } from "@/bindings";
 import { useOsType } from "@/hooks/useOsType";
-import { Button } from "../../ui/Button";
 import { SettingsGroup } from "../../ui/SettingsGroup";
-import { ShortcutInput } from "../ShortcutInput";
-import { formatElapsed } from "./elapsed";
+import { ExportPanel } from "./ExportPanel";
+import { MeetingDetail } from "./MeetingDetail";
+import { MeetingList } from "./MeetingList";
+import { RecordPanel } from "./RecordPanel";
+import { TopicsPanel } from "./TopicsPanel";
+import { useMeetings } from "./useMeetings";
 
-const TIMER_TICK_MS = 1000;
-
-const IDLE: MeetingState = { recording: false, started_at_ms: null };
-
-/** The backend's meeting state, kept current by its events. */
-const useMeetingState = (): MeetingState => {
-  const [state, setState] = useState<MeetingState>(IDLE);
+/** The folder meetings are exported to, as the backend has it. */
+const useExportDir = () => {
+  const [dir, setDir] = useState<string | null>(null);
   useEffect(() => {
-    commands.getMeetingState().then(setState);
-    const unlisten = events.meetingState.listen(({ payload }) =>
-      setState(payload),
-    );
-    return () => {
-      unlisten.then((off) => off());
-    };
+    commands.getMeetingExportDir().then((result) => {
+      if (result.status === "ok") setDir(result.data);
+    });
   }, []);
-  return state;
-};
-
-/** Milliseconds since `startedAtMs`, ticking once a second. */
-const useElapsed = (startedAtMs: number | null): number => {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (startedAtMs === null) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), TIMER_TICK_MS);
-    return () => window.clearInterval(timer);
-  }, [startedAtMs]);
-  return startedAtMs === null ? 0 : now - startedAtMs;
+  return [dir, setDir] as const;
 };
 
 export const MeetingSettings: React.FC = () => {
   const { t } = useTranslation();
   const osType = useOsType();
-  const { recording, started_at_ms } = useMeetingState();
-  const elapsed = useElapsed(started_at_ms);
-  const [pending, setPending] = useState<"starting" | "stopping" | null>(null);
-  // The last meeting went to History; shown until the next one starts.
-  const [saved, setSaved] = useState(false);
+  const { meetings, topics, loading, error, reload } = useMeetings();
+  const [exportDir, setExportDir] = useExportDir();
+  const [openId, setOpenId] = useState<string | null>(null);
 
-  const start = async () => {
-    setSaved(false);
-    setPending("starting");
-    const result = await commands.startMeeting();
-    setPending(null);
-    if (result.status === "error") {
-      notify({
-        title: t("settings.meeting.startFailed", { error: result.error }),
-      });
-    }
-  };
+  const open =
+    openId === null ? undefined : meetings.find((m) => m.id === openId);
 
-  const stop = async () => {
-    setPending("stopping");
-    const result = await commands.stopMeeting();
-    setPending(null);
-    if (result.status === "error") {
-      notify({
-        title: t("settings.meeting.stopFailed", { error: result.error }),
-      });
-    } else {
-      setSaved(true);
-    }
-  };
+  // A meeting deleted elsewhere closes.
+  useEffect(() => {
+    if (openId !== null && !loading && !open) setOpenId(null);
+  }, [openId, open, loading]);
 
-  const buttonLabel =
-    pending === "starting"
-      ? t("settings.meeting.starting")
-      : pending === "stopping"
-        ? t("settings.meeting.stopping")
-        : recording
-          ? t("settings.meeting.stop")
-          : t("settings.meeting.start");
+  if (open) {
+    return (
+      <div className="max-w-3xl w-full mx-auto">
+        <MeetingDetail
+          meeting={open}
+          topics={topics}
+          canExport={exportDir !== null}
+          onBack={() => setOpenId(null)}
+          onChanged={reload}
+        />
+      </div>
+    );
+  }
 
   const tips = [
     { icon: ShieldCheck, text: t("settings.meeting.consent") },
@@ -93,42 +61,20 @@ export const MeetingSettings: React.FC = () => {
 
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
-      <SettingsGroup
-        title={t("settings.meeting.title")}
-        description={t("settings.meeting.description")}
-      >
-        <div className="px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm" aria-live="polite">
-            <Circle
-              className={
-                recording
-                  ? "w-3 h-3 fill-error text-error"
-                  : "w-3 h-3 text-ink-3"
-              }
-            />
-            <span>
-              {recording
-                ? t("settings.meeting.recording")
-                : saved
-                  ? t("settings.meeting.saved")
-                  : t("settings.meeting.idle")}
-            </span>
-            {recording && (
-              <span className="font-mono tabular-nums text-ink-2">
-                {formatElapsed(elapsed)}
-              </span>
-            )}
-          </div>
-          <Button
-            variant={recording ? "danger" : "primary"}
-            onClick={recording ? stop : start}
-            disabled={pending !== null}
-          >
-            {buttonLabel}
-          </Button>
-        </div>
-        <ShortcutInput shortcutId="meeting_toggle" grouped={true} />
-      </SettingsGroup>
+      <RecordPanel topics={topics} onTopicsChanged={reload} />
+      {error && (
+        <p className="px-4 text-sm text-error">
+          {t("settings.meeting.list.loadFailed", { error })}
+        </p>
+      )}
+      <MeetingList
+        meetings={meetings}
+        topics={topics}
+        loading={loading}
+        onOpen={setOpenId}
+      />
+      <TopicsPanel topics={topics} meetings={meetings} onChanged={reload} />
+      <ExportPanel dir={exportDir} onChanged={setExportDir} />
       <SettingsGroup title={t("settings.meeting.tipsTitle")}>
         {tips.map(({ icon: Icon, text }) => (
           <div key={text} className="px-4 py-3 flex items-start gap-3 text-sm">

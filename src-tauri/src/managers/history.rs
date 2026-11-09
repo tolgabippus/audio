@@ -432,6 +432,34 @@ impl HistoryManager {
         Ok(entry)
     }
 
+    /// Renames the file entry recorded as `file_name`, as History shows it.
+    /// Does nothing when there is no such entry.
+    pub fn set_source_name(&self, file_name: &str, source_name: &str) -> Result<()> {
+        let conn = self.get_connection()?;
+        let entry = conn
+            .query_row(
+                &format!("SELECT {ENTRY_COLUMNS} FROM transcription_history WHERE file_name = ?1"),
+                [file_name],
+                Self::map_history_entry,
+            )
+            .optional()?;
+        let Some(mut entry) = entry else {
+            return Ok(());
+        };
+        if entry.source_name.as_deref() == Some(source_name) {
+            return Ok(());
+        }
+        conn.execute(
+            "UPDATE transcription_history SET source_name = ?1 WHERE id = ?2",
+            params![source_name, entry.id],
+        )?;
+        entry.source_name = Some(source_name.to_string());
+        if let Err(e) = (HistoryUpdatePayload::Updated { entry }).emit(&self.app_handle) {
+            error!("Failed to emit history-updated event: {}", e);
+        }
+        Ok(())
+    }
+
     pub fn cleanup_old_entries(&self) -> Result<()> {
         let retention_period = crate::settings::get_recording_retention_period(&self.app_handle);
 
